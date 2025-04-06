@@ -135,21 +135,24 @@ namespace VatpacPlugin
 
             if (controllerInfo == null) return;
 
-            var lastLine = controllerInfo.Last();
+            var newInfo = new List<string>();
 
-            if (lastLine.StartsWith("Extending"))
+            foreach (var line in controllerInfo)
             {
-                controllerInfo = controllerInfo.Take(controllerInfo.Count() - 1).ToArray();
+                if (!line.StartsWith("Extending"))
+                {
+                    newInfo.Add(line);
+
+                    continue; 
+                }
             }
 
-            if (extending == string.Empty)
+            if (extending != string.Empty)
             {
-                Network.ControllerInfo = controllerInfo.ToArray();
-
-                return;
+                newInfo.Add(extending);
             }
 
-            Network.ControllerInfo = controllerInfo.Append(extending).ToArray();
+            Network.ControllerInfo = newInfo.ToArray();
         }
 
         private async Task SendScratchPad(string callsign, string scratchPad)
