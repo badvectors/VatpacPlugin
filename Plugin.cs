@@ -9,6 +9,7 @@ using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using vatsys;
 using vatsys.Plugin;
+using static vatsys.FDP2;
 
 namespace VatpacPlugin
 {
@@ -18,10 +19,10 @@ namespace VatpacPlugin
         public string Name => "VATPAC";
         public static string DisplayName => "VATPAC";
 
-        private static string Server => "https://localhost:7013/api/Aircraft";
+        private static string Server => "https://vss.prod1.badvectors.dev/api";
         private HttpClient _httpClient = new HttpClient();
-        private HashSet<string> _checkedAircraft = new HashSet<string>();
         private HashSet<string> _trackedAircraft = new HashSet<string>();
+        private Dictionary<string, Aircraft> _toApply = new Dictionary<string, Aircraft>();
 
 
         [DllImport("kernel32.dll", SetLastError = true)]
@@ -34,12 +35,11 @@ namespace VatpacPlugin
             Audio.FrequencyErrorStateChanged += Audio_VSCSFrequenciesChanged;
             Network.PrimaryFrequencyChanged += Audio_VSCSFrequenciesChanged;
             Network.Disconnected += Network_Disconnected;
-
-            AllocConsole();
+            Network.Connected += Network_Connected;
         }
 
         private List<string> Fields = new List<string>{ "LabelOpData",
-            "CFLUpper", "CFLLower", "CFLVisual", "GlobalOpData" };
+            "CFLUpper", "CFLLower", "CFLVisual", "GlobalOpData", "ControllerTracking" };
 
         private async void Fdr_PropertyChanged(object sender, PropertyChangedEventArgs e)
         {
@@ -51,6 +51,10 @@ namespace VatpacPlugin
 
             switch (e.PropertyName)
             {
+                case "ControllerTracking":
+                    Console.WriteLine($"{fdr.Callsign} {e.PropertyName} {fdr.ControllerTracking?.Callsign}");
+                    await SendControllerTracking(fdr.Callsign, fdr.ControllerTracking?.Callsign);
+                    break;
                 case "CFLUpper":
                     Console.WriteLine($"{fdr.Callsign} {e.PropertyName} {fdr.CFLUpper}");
                     await SendCFLUpper(fdr.Callsign, fdr.CFLUpper);
@@ -77,10 +81,17 @@ namespace VatpacPlugin
 
         }
 
+        private async void Network_Connected(object sender, EventArgs e)
+        {
+            //if (!Network.IsOfficialServer) return;
+            //if (!Network.IsValidATC) return;
+            await GetExisting();
+        }
+
         private void Network_Disconnected(object sender, EventArgs e)
         {
-            _checkedAircraft.Clear();
             _trackedAircraft.Clear();
+            _toApply.Clear();
         }
 
         private void Audio_VSCSFrequenciesChanged(object sender, EventArgs e)
@@ -141,34 +152,11 @@ namespace VatpacPlugin
             Network.ControllerInfo = controllerInfo.Append(extending).ToArray();
         }
 
-        public async void OnFDRUpdate(FDP2.FDR updated)
-        {
-            var trackedAircraft = _trackedAircraft.Contains(updated.Callsign);
-
-            if (!trackedAircraft)
-            {
-                Console.WriteLine($"{updated.Callsign}");
-
-                _trackedAircraft.Add(updated.Callsign);
-
-                updated.PropertyChanged += Fdr_PropertyChanged;
-            }
-
-            var checkedAircraft = _checkedAircraft.Contains(updated.Callsign);
-
-            if (!checkedAircraft)
-            {
-                _checkedAircraft.Add(updated.Callsign);
-
-                await CheckSharedState(updated.Callsign);
-            }
-        }
-
         private async Task SendScratchPad(string callsign, string scratchPad)
         {
             try
             {
-                await _httpClient.PostAsync($"{Server}/{callsign}/ScratchPad?value={scratchPad}", null);
+                await _httpClient.PostAsync($"{Server}/Aircraft/{callsign}/ScratchPad?value={scratchPad}", null);
             }
             catch { }
         }
@@ -177,7 +165,18 @@ namespace VatpacPlugin
         {
             try
             {
-                await _httpClient.PostAsync($"{Server}/{callsign}/Global?value={global}", null);
+                var test = await _httpClient.PostAsync($"{Server}/Aircraft/{callsign}/Global?value={global}", null);
+
+                test.EnsureSuccessStatusCode();
+            }
+            catch { }
+        }
+
+        private async Task SendControllerTracking(string callsign, string controllerTracking)
+        {
+            try
+            {
+                await _httpClient.PostAsync($"{Server}/Aircraft/{callsign}/ControllerTracking?value={controllerTracking}", null);
             }
             catch { }
         }
@@ -186,7 +185,7 @@ namespace VatpacPlugin
         {
             try
             {
-                await _httpClient.PostAsync($"{Server}/{callsign}/CFLUpper?value={cflUpper}", null);
+                await _httpClient.PostAsync($"{Server}/Aircraft/{callsign}/CFLUpper?value={cflUpper}", null);
             }
             catch { }
         }
@@ -195,7 +194,7 @@ namespace VatpacPlugin
         {
             try
             {
-                await _httpClient.PostAsync($"{Server}/{callsign}/CFLLower?value={cflLower}", null);
+                await _httpClient.PostAsync($"{Server}/Aircraft/{callsign}/CFLLower?value={cflLower}", null);
             }
             catch { }
         }
@@ -204,51 +203,103 @@ namespace VatpacPlugin
         {
             try
             {
-                await _httpClient.PostAsync($"{Server}/{callsign}/CFLVisual?value={cflVisual}", null);
+                await _httpClient.PostAsync($"{Server}/Aircraft/{callsign}/CFLVisual?value={cflVisual}", null);
             }
             catch { }
         }
 
-        private async Task CheckSharedState(string callsign)
+        private async Task GetExisting()
         {
             try
             {
-                var response = await _httpClient.GetAsync($"{Server}/{callsign}");
+                var response = await _httpClient.GetAsync($"{Server}/Aircraft");
 
                 response.EnsureSuccessStatusCode();
 
                 var content = await response.Content.ReadAsStringAsync();
 
-                var aircraft = JsonConvert.DeserializeObject<Aircraft>(content);
+                var existing = JsonConvert.DeserializeObject<List<Aircraft>>(content);
 
-                if (aircraft == null) return;
-
-                var fdr = FDP2.GetFDRs.FirstOrDefault(x => x.Callsign == callsign);
-
-                if (fdr == null) return;
-
-                if (aircraft.Global != null)
+                foreach (var aircraft in existing)
                 {
-                    fdr.GlobalOpData = aircraft.Global;
-                }
-
-                if (aircraft.ScratchPad != null)
-                {
-                    fdr.LabelOpData = aircraft.ScratchPad;
-                }
-
-                if (aircraft.CFLUpper != null)
-                {
-                    fdr.CFLUpper = aircraft.CFLUpper.Value;
+                    _toApply.Add(aircraft.Callsign, aircraft);
                 }
             }
             catch { }
         }
 
+        private void ApplySharedState(Aircraft aircraft, FDP2.FDR fdr)
+        {
+            if (aircraft == null) return;
+
+            if (fdr == null) return;
+
+            if (aircraft.Global != null)
+            {
+                fdr.GlobalOpData = aircraft.Global;
+            }
+
+            if (aircraft.ScratchPad != null)
+            {
+                fdr.LabelOpData = aircraft.ScratchPad;
+            }
+
+            if (aircraft.CFLUpper != null)
+            {
+                fdr.CFLUpper = aircraft.CFLUpper.Value;
+            }
+
+            if (aircraft.PreviousTracking != null && 
+                aircraft.PreviousTracking == Network.Me.Callsign)
+            {
+                MMI.AcceptJurisdiction(fdr);
+            }
+        }
+
+        public void OnFDRUpdate(FDP2.FDR updated)
+        {
+            var trackedAircraft = _trackedAircraft.Contains(updated.Callsign);
+
+            if (trackedAircraft) return;
+
+            Console.WriteLine($"{updated.Callsign}");
+
+            _trackedAircraft.Add(updated.Callsign);
+
+            updated.PropertyChanged += Fdr_PropertyChanged;
+        }
+
         public void OnRadarTrackUpdate(RDP.RadarTrack updated)
         {
+            if (updated.ActualAircraft == null) return;
 
-            return;
+            var callsign = updated.ActualAircraft.Callsign;
+
+            var success = _toApply.TryGetValue(callsign, out var aircraft);
+
+            if (!success) return;
+
+            var fdr = FDP2.GetFDRs.FirstOrDefault(x => x.Callsign == callsign);
+
+            if (fdr == null) return;
+
+            // Add a ATD if required.
+            if (fdr.ATD == DateTime.MaxValue)
+            {
+                DepartFDR(fdr, DateTime.UtcNow.AddMinutes(-10));
+            }
+
+            // Estimate and couple the track but don't accept it.
+            if (!fdr.ESTed) MMI.EstFDR(fdr);
+
+            if (updated.CoupledFDR == null) return;
+
+            // Check if coming through the sector.
+            if (!MMI.IsMySectorConcerned(fdr)) return;
+
+            _toApply.Remove(callsign);
+
+            ApplySharedState(aircraft, updated.CoupledFDR);
         }
 
         public void Dispose()
