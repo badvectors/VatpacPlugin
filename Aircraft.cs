@@ -1,5 +1,6 @@
 ﻿using Newtonsoft.Json;
 using System;
+using System.Collections.Generic;
 
 namespace VatpacPlugin
 {
@@ -28,6 +29,9 @@ namespace VatpacPlugin
 
         [JsonProperty(PropertyName = "lastController")] 
         public string LastController { get; private set; }
+
+        //[JsonProperty(PropertyName = "positions")]
+        //public List<Position> Positions { get; private set; } = new List<Position>();
 
         [JsonProperty(PropertyName = "lastUpdateUtc")]
         public DateTime LastUpdateUtc { get; private set; }

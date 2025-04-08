@@ -2,11 +2,18 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Configuration;
+using System.IO;
 using System.Linq;
 using System.Net.Http;
+using System.Security.Cryptography;
+using System.Text;
 using System.Threading.Tasks;
+using System.Timers;
+using System.Xml;
 using vatsys;
 using static vatsys.FDP2;
+using Timer = System.Timers.Timer;
 
 namespace VatpacPlugin
 {
@@ -16,28 +23,78 @@ namespace VatpacPlugin
         private readonly HashSet<string> _trackedAircraft = new HashSet<string>();
         private readonly Dictionary<string, Aircraft> _toApply = new Dictionary<string, Aircraft>();
 
+        //private readonly string Server = "http://localhost:5126/api";
         private readonly string Server = "https://vss.prod1.badvectors.dev/api";
-        private readonly List<string> Fields = new List<string>{ "LabelOpData", "State",
-            "CFLUpper", "CFLLower", "CFLVisual", "GlobalOpData", "ControllerTracking" };
 
-        public async Task Start()
+        private readonly List<string> Fields = new List<string>{ "LabelOpData", "State",
+            "CFLUpper", "CFLLower", "CFLVisual", "GlobalOpData", "ControllerTracking", //"ParsedRoute" 
+        };
+
+        private Guid? Token = null;
+        private DateTime? ExpiryUtc = null;
+        private Timer TokenTimer = new Timer();
+        private Settings Settings = null;
+
+        public async void Init()
         {
-            //if (!Network.IsOfficialServer) return;
-            //if (!Network.IsValidATC) return;
+            GetSettings();
+
+            await GetToken();
+
+            TokenTimer.Elapsed += new ElapsedEventHandler(TokenTimer_Elasped);
+            TokenTimer.Interval = TimeSpan.FromMinutes(30).TotalMilliseconds;
+            TokenTimer.AutoReset = true;
+
+            TokenTimer.Start();
+        }
+
+        public async Task Connected()
+        {
             await GetExisting();
         }
 
-        public void End()
+        public void Disconnected()
         {
             _trackedAircraft.Clear();
+
             _toApply.Clear();
+        }
+
+        private async Task GetToken()
+        {
+            if (Settings == null)
+            {
+                Errors.Add(new Exception("Could not load settings."), Plugin.DisplayName);
+                return;
+            }
+
+            if (Token == null)
+            {
+                await Login(Settings.CID, DecryptString(Settings.Password));
+                return;
+            }
+
+            if (ExpiryUtc != null && ExpiryUtc < DateTime.UtcNow)
+            {
+                await Login(Settings.CID, DecryptString(Settings.Password));
+                return;
+            }
+
+            await Refresh(Settings.CID);
+        }
+
+        private async void TokenTimer_Elasped(object sender, ElapsedEventArgs e)
+        {
+            await GetToken();
         }
 
         public void OnFdrUpdate(FDP2.FDR updated)
         {
-            var trackedAircraft = _trackedAircraft.Contains(updated.Callsign);
+            if (!Network.IsValidATC) return;
 
-            if (trackedAircraft) return;
+            if (!Network.IsOfficialServer) return;
+
+            if (_trackedAircraft.Contains(updated.Callsign)) return;
 
             _trackedAircraft.Add(updated.Callsign);
 
@@ -46,6 +103,10 @@ namespace VatpacPlugin
 
         public void OnRadarUpdate(RDP.RadarTrack updated)
         {
+            if (!Network.IsValidATC) return;
+
+            if (!Network.IsOfficialServer) return;
+
             if (updated.ActualAircraft == null) return;
 
             var callsign = updated.ActualAircraft.Callsign;
@@ -58,7 +119,7 @@ namespace VatpacPlugin
 
             if (fdr == null) return;
 
-            // COORDINATED, UNCONTROLLED && CONTROLLED
+            // COORDINATED
             if (aircraft.State == "STATE_COORDINATED")
             {
                 ApplySharedState(aircraft, fdr);
@@ -70,9 +131,8 @@ namespace VatpacPlugin
                 return;
             }
 
-            // COORDINATED, UNCONTROLLED && CONTROLLED
-            if (aircraft.State == "STATE_CONTROLLED" ||
-                aircraft.State == "STATE_UNCONTROLLED")
+            //  UNCONTROLLED 
+            if (aircraft.State == "STATE_UNCONTROLLED")
             {
                 if (fdr.ATD == DateTime.MaxValue)
                 {
@@ -84,6 +144,30 @@ namespace VatpacPlugin
                 if (updated.CoupledFDR == null) return;
 
                 ApplySharedState(aircraft, updated.CoupledFDR);
+
+                _toApply.Remove(callsign);
+
+                return;
+            }
+
+            //  CONTROLLED
+            if (aircraft.State == "STATE_CONTROLLED")
+            {
+                if (fdr.ATD == DateTime.MaxValue)
+                {
+                    DepartFDR(fdr, DateTime.UtcNow.AddMinutes(-10));
+                }
+
+                if (!fdr.ESTed) MMI.EstFDR(fdr);
+
+                if (updated.CoupledFDR == null) return;
+
+                ApplySharedState(aircraft, updated.CoupledFDR);
+
+                if (aircraft.LastController != null && aircraft.LastController == Network.Me.Callsign)
+                {
+                    MMI.AcceptJurisdiction(fdr);
+                }
 
                 _toApply.Remove(callsign);
 
@@ -105,6 +189,16 @@ namespace VatpacPlugin
 
             switch (e.PropertyName)
             {
+                //case "ParsedRoute":
+                //    var positions = new List<Position>();
+                //    foreach (var point in fdr.ParsedRoute)
+                //    {
+                //        if (!point.IsPETO) continue;
+                //        positions.Add(new Position(point.Intersection.Name, point.ETO, point.ATO, point.MPRArmed));
+                //    }
+                //    if (!positions.Any()) break;
+                //    await SendPositions(fdr.Callsign, positions);
+                //    break;
                 case "State":
                     Console.WriteLine($"{fdr.Callsign} {e.PropertyName} {fdr.State}");
                     await SendState(fdr.Callsign, fdr.State.ToString());
@@ -177,19 +271,39 @@ namespace VatpacPlugin
                 fdr.CFLUpper = aircraft.CFLUpper.Value;
             }
 
-            if (aircraft.State == "STATE_CONTROLLED" &&
-                aircraft.LastController != null &&
-                aircraft.LastController == Network.Me.Callsign)
-            {
-                MMI.AcceptJurisdiction(fdr);
-            }
+            //if (aircraft.Positions.Any())
+            //{
+            //    foreach (var position in aircraft.Positions)
+            //    {
+            //        var point = fdr.ParsedRoute.FirstOrDefault(x => x.Intersection.Name == position.Name);
+
+            //        if (point == null) continue;
+
+            //        point.ETO = point.ETO;
+            //        point.ATO = point.ATO; 
+                    
+            //    }
+            //}
         }
 
-        private async Task SendState(string callsign, string scratchPad)
+        //private async Task SendPositions(string callsign, List<Position> positions)
+        //{
+        //    try
+        //    {
+        //        var json = JsonConvert.SerializeObject(positions);
+
+        //        var stringContent = new StringContent(json, Encoding.UTF8, "application/json");
+
+        //        await _httpClient.PostAsync($"{Server}/Aircraft/{callsign}/Positions", stringContent);
+        //    }
+        //    catch { }
+        //}
+
+        private async Task SendState(string callsign, string state)
         {
             try
             {
-                await _httpClient.PostAsync($"{Server}/Aircraft/{callsign}/State?value={scratchPad}", null);
+                await _httpClient.PostAsync($"{Server}/Aircraft/{callsign}/State?value={state}", null);
             }
             catch { }
         }
@@ -198,7 +312,7 @@ namespace VatpacPlugin
         {
             try
             {
-                await _httpClient.PostAsync($"{Server}/Aircraft/{callsign}/ScratchPad?value={scratchPad}", null);
+                var response = await _httpClient.PostAsync($"{Server}/Aircraft/{callsign}/ScratchPad?value={scratchPad}", null);
             }
             catch { }
         }
@@ -248,6 +362,128 @@ namespace VatpacPlugin
                 await _httpClient.PostAsync($"{Server}/Aircraft/{callsign}/CFLVisual?value={cflVisual}", null);
             }
             catch { }
+        }
+
+        private async Task Login(int cid, string password)
+        {
+            try
+            {
+                var response = await _httpClient.PostAsync($"{Server}/Atc/{cid}/Login?password={password}", null);
+
+                response.EnsureSuccessStatusCode();
+
+                var content = await response.Content.ReadAsStringAsync();
+
+                var atc = JsonConvert.DeserializeObject<Atc>(content);
+
+                Token = atc.Token;
+
+                ExpiryUtc = atc.ExpiryUtc;
+
+                UpdateTokenOnClient();
+            }
+            catch (Exception e) 
+            {
+                Errors.Add(new Exception($"Could login: {e.Message}"), Plugin.DisplayName);
+            }
+        }
+
+        private async Task Refresh(int cid)
+        {
+            try
+            {
+                var response = await _httpClient.PostAsync($"{Server}/Atc/{cid}/Refresh", null);
+
+                response.EnsureSuccessStatusCode();
+
+                var content = await response.Content.ReadAsStringAsync();
+
+                var atc = JsonConvert.DeserializeObject<Atc>(content);
+
+                Token = atc.Token;
+
+                ExpiryUtc = atc.ExpiryUtc;
+
+                UpdateTokenOnClient();
+            }
+            catch (Exception e)
+            {
+                Errors.Add(new Exception($"Could refresh token: {e.Message}"), Plugin.DisplayName);
+            }
+        }
+
+        private async Task Logout(int cid)
+        {
+            try
+            {
+                await _httpClient.PostAsync($"{Server}/Atc/{cid}/Logout", null);
+
+                UpdateTokenOnClient();
+            }
+            catch { }
+        }
+
+        private void UpdateTokenOnClient()
+        {
+            _httpClient.DefaultRequestHeaders.Remove("vss-token");
+
+            if (Token != null)
+            {
+                _httpClient.DefaultRequestHeaders.Add("vss-token", Token.Value.ToString());
+            }
+        }
+
+        private void GetSettings()
+        {
+            var configuration = ConfigurationManager.OpenExeConfiguration(ConfigurationUserLevel.PerUserRoamingAndLocal);
+
+            if (!configuration.HasFile) return;
+
+            if (!File.Exists(configuration.FilePath)) return;
+
+            var config = File.ReadAllText(configuration.FilePath);
+
+            Settings settings = new Settings();
+
+            XmlDocument xmlDocument = new XmlDocument();
+
+            xmlDocument.LoadXml(config);
+
+            var cidString = string.Empty;
+
+            foreach (XmlNode childNode in xmlDocument.DocumentElement.SelectSingleNode("userSettings").SelectSingleNode("vatsys.Properties.Settings").ChildNodes)
+            {
+                if (childNode.Attributes.GetNamedItem("name").Value == "VATSIMID")
+                    cidString = childNode.InnerText;
+                else if (childNode.Attributes.GetNamedItem("name").Value == "Password")
+                    settings.Password = childNode.InnerText;
+            }
+
+            var success = int.TryParse(cidString, out var cid);
+
+            if (!success)
+            {
+                Errors.Add(new Exception("Could not load settings."), Plugin.DisplayName);
+                return;
+            }
+
+            settings.CID = cid;
+
+            Settings = settings;
+        }
+
+        private string DecryptString(string encryptedData)
+        {
+            if (encryptedData == null) return string.Empty;
+
+            try
+            {
+                return Encoding.UTF8.GetString(ProtectedData.Unprotect(Convert.FromBase64String(encryptedData), Encoding.UTF8.GetBytes(Settings.Entropy), DataProtectionScope.CurrentUser));
+            }
+            catch
+            {
+                return string.Empty;
+            }
         }
     }
 }

@@ -22,20 +22,22 @@ namespace VatpacPlugin
             Audio.VSCSFrequenciesChanged += Audio_VSCSFrequenciesChanged;
             Audio.FrequencyErrorStateChanged += Audio_VSCSFrequenciesChanged;
             Network.PrimaryFrequencyChanged += Audio_VSCSFrequenciesChanged;
-            Network.Disconnected += Network_Disconnected;
             Network.Connected += Network_Connected;
+            Network.Disconnected += Network_Disconnected;
 
-            // AllocConsole();
-        }
+            SharedState.Init();
 
-        private async void Network_Connected(object sender, EventArgs e)
-        {
-            await SharedState.Start();
+            AllocConsole();
         }
 
         private void Network_Disconnected(object sender, EventArgs e)
         {
-            SharedState.End();
+            SharedState.Disconnected();
+        }
+
+        private async void Network_Connected(object sender, EventArgs e)
+        {
+            await SharedState.Connected();
         }
 
         private void Audio_VSCSFrequenciesChanged(object sender, EventArgs e)
