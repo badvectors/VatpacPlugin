@@ -8,6 +8,9 @@ namespace VatpacPlugin
         [JsonProperty(PropertyName = "callsign")] 
         public string Callsign { get; private set; }
 
+        [JsonProperty(PropertyName = "state")]
+        public string State { get; private set; }
+
         [JsonProperty(PropertyName = "scratchPad")] 
         public string ScratchPad { get; private set; }
 
@@ -23,11 +26,8 @@ namespace VatpacPlugin
         [JsonProperty(PropertyName = "cflVisual")] 
         public bool CFLVisual { get; private set; }
 
-        [JsonProperty(PropertyName = "controllerTracking")] 
-        public string ControllerTracking { get; private set; }
-
-        [JsonProperty(PropertyName = "previousTracking")]
-        public string PreviousTracking { get; private set; }
+        [JsonProperty(PropertyName = "lastController")] 
+        public string LastController { get; private set; }
 
         [JsonProperty(PropertyName = "lastUpdateUtc")]
         public DateTime LastUpdateUtc { get; private set; }
