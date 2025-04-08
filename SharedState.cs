@@ -299,11 +299,27 @@ namespace VatpacPlugin
         //    catch { }
         //}
 
+        private async Task CheckTokenError(HttpResponseMessage response)
+        {
+            var content = await response.Content.ReadAsStringAsync();
+
+            if (content != "Invalid token." && content != "Token expired.") return;
+
+            Token = null;
+
+            ExpiryUtc = null;
+
+            await GetToken();
+        }
+
         private async Task SendState(string callsign, string state)
         {
             try
             {
-                await _httpClient.PostAsync($"{Server}/Aircraft/{callsign}/State?value={state}", null);
+                var response = await _httpClient.PostAsync($"{Server}/Aircraft/{callsign}/State?value={state}", null);
+
+                if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized) await CheckTokenError(response);
+                
             }
             catch { }
         }
@@ -313,6 +329,8 @@ namespace VatpacPlugin
             try
             {
                 var response = await _httpClient.PostAsync($"{Server}/Aircraft/{callsign}/ScratchPad?value={scratchPad}", null);
+
+                if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized) await CheckTokenError(response);
             }
             catch { }
         }
@@ -321,9 +339,9 @@ namespace VatpacPlugin
         {
             try
             {
-                var test = await _httpClient.PostAsync($"{Server}/Aircraft/{callsign}/Global?value={global}", null);
+                var response = await _httpClient.PostAsync($"{Server}/Aircraft/{callsign}/Global?value={global}", null);
 
-                test.EnsureSuccessStatusCode();
+                if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized) await CheckTokenError(response);
             }
             catch { }
         }
@@ -332,7 +350,9 @@ namespace VatpacPlugin
         {
             try
             {
-                await _httpClient.PostAsync($"{Server}/Aircraft/{callsign}/ControllerTracking?value={controllerTracking}", null);
+                var response = await _httpClient.PostAsync($"{Server}/Aircraft/{callsign}/ControllerTracking?value={controllerTracking}", null);
+
+                if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized) await CheckTokenError(response);
             }
             catch { }
         }
@@ -341,7 +361,9 @@ namespace VatpacPlugin
         {
             try
             {
-                await _httpClient.PostAsync($"{Server}/Aircraft/{callsign}/CFLUpper?value={cflUpper}", null);
+                var response = await _httpClient.PostAsync($"{Server}/Aircraft/{callsign}/CFLUpper?value={cflUpper}", null);
+
+                if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized) await CheckTokenError(response);
             }
             catch { }
         }
@@ -350,7 +372,9 @@ namespace VatpacPlugin
         {
             try
             {
-                await _httpClient.PostAsync($"{Server}/Aircraft/{callsign}/CFLLower?value={cflLower}", null);
+                var response = await _httpClient.PostAsync($"{Server}/Aircraft/{callsign}/CFLLower?value={cflLower}", null);
+
+                if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized) await CheckTokenError(response);
             }
             catch { }
         }
@@ -359,7 +383,9 @@ namespace VatpacPlugin
         {
             try
             {
-                await _httpClient.PostAsync($"{Server}/Aircraft/{callsign}/CFLVisual?value={cflVisual}", null);
+                var response = await _httpClient.PostAsync($"{Server}/Aircraft/{callsign}/CFLVisual?value={cflVisual}", null);
+
+                if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized) await CheckTokenError(response);
             }
             catch { }
         }
