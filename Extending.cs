@@ -5,6 +5,14 @@ namespace VatpacPlugin
 {
     public class Extending
     {
+        private static readonly Dictionary<string, string> Mapping = new Dictionary<string, string>()
+        {
+            { "ML-GUN_CTR","BIK 129.8 use 128.4 " },
+            { "ML-BLA_CTR","ELW 123.75 use 132.2 " },
+            { "ML-HYD_CTR","PIY 133.9 use 118.2 " },
+            { "ML-MUN_CTR","YWE 134.325 use 132.6 " },
+        };
+
         public static void Check()
         {
             if (!Network.Me.Callsign.EndsWith("_CTR")) return;
@@ -19,19 +27,13 @@ namespace VatpacPlugin
 
                 if (!frequency.Name.EndsWith("_CTR")) continue;
 
-                if (frequency.Name == "ML-GUN_CTR")
-                {
-                    mapping = "BIK 129.8 use 128.4 ";
-                }
-                else if (frequency.Name == "ML-BLA_CTR")
-                {
-                    mapping = "ELW 123.75 use 132.2 ";
-                }
-                else if (frequency.Name == "ML-HYD_CTR")
-                {
-                    mapping = "PIY 133.9 use 118.2 ";
-                }
+                var mapOk = Mapping.TryGetValue(frequency.Name, out string text);
 
+                if (mapOk)
+                {
+                    mapping += text;
+                }
+     
                 if (frequency.Name == Network.Me.Callsign) continue;
 
                 var shortName = frequency.Name
