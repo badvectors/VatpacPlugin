@@ -27,7 +27,7 @@ namespace VatpacPlugin
 
             SharedState.Init();
 
-            AllocConsole();
+            // AllocConsole();
         }
 
         private void Network_Disconnected(object sender, EventArgs e)
