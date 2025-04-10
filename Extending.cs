@@ -21,7 +21,7 @@ namespace VatpacPlugin
 
                 if (frequency.Name == "ML-GUN_CTR")
                 {
-                    mapping = "BIK 129.8 use 128.3 ";
+                    mapping = "BIK 129.8 use 128.4 ";
                 }
                 else if (frequency.Name == "ML-BLA_CTR")
                 {
