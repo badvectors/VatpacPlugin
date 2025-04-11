@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.Linq;
 using vatsys;
 
 namespace VatpacPlugin
@@ -7,19 +8,19 @@ namespace VatpacPlugin
     {
         private static readonly Dictionary<string, string> Mapping = new Dictionary<string, string>()
         {
-            { "ML-GUN_CTR","BIK 129.8 use 128.4 " },
-            { "ML-BLA_CTR","ELW 123.75 use 132.2 " },
-            { "ML-HYD_CTR","PIY 133.9 use 118.2 " },
-            { "ML-MUN_CTR","YWE 134.325 use 132.6 " },
+            { "ML-GUN_CTR","BIK 129.8 use 128.4" },
+            { "ML-BLA_CTR","ELW 123.75 use 132.2" },
+            { "ML-HYD_CTR","PIY 133.9 use 118.2" },
+            { "ML-MUN_CTR","YWE 134.325 use 132.6" },
         };
 
         public static void Check()
         {
             if (!Network.Me.Callsign.EndsWith("_CTR")) return;
 
-            var extending = string.Empty;
+            var extending = new List<string>();
 
-            var mapping = string.Empty;
+            var mapping = new List<string>();
 
             foreach (var frequency in Audio.VSCSFrequencies)
             {
@@ -31,7 +32,7 @@ namespace VatpacPlugin
 
                 if (mapOk)
                 {
-                    mapping += text;
+                    mapping.Add(text);
                 }
      
                 if (frequency.Name == Network.Me.Callsign) continue;
@@ -41,20 +42,52 @@ namespace VatpacPlugin
                     .Replace("BN-", "")
                     .Replace("ML-", "");
 
-                extending += $"{shortName} {Conversions.FrequencyToString(frequency.Frequency)} ";
+                extending.Add($"{shortName} {Conversions.FrequencyToString(frequency.Frequency)}");
             }
 
-            if (extending != string.Empty)
+            var extendingText = string.Empty;
+
+            var mappingText = string.Empty;
+
+            if (extending.Any())
             {
-                extending = $"Extending {extending}";
+                extendingText = $"Extending {DoText(extending)}";
             }
 
-            if (mapping != string.Empty)
+            if (mapping.Any())
             {
-                mapping = $"Uncontactable on {mapping}";
+                mappingText = $"Uncontactable on {DoText(mapping)}";
             }
 
-            UpdateInfo(extending, mapping);
+            UpdateInfo(extendingText, mappingText);
+        }
+
+        private static string DoText(List<string> input)
+        {
+            int count = 0;
+
+            string text = string.Empty;
+
+            foreach (var item in input)
+            {
+                count++;
+
+                if (count == 1)
+                {
+                    text = item;
+                    continue;
+                }
+
+                if (count < input.Count - 1)
+                {
+                    text = $"{text}, {item}";
+                    continue;
+                }
+
+                text = $"{text} and {item}";
+            }
+
+            return text;
         }
 
         private static void UpdateInfo(string extending, string mapping)
@@ -75,14 +108,26 @@ namespace VatpacPlugin
                 }
             }
 
+            var newLine = string.Empty;
+
             if (extending != string.Empty)
             {
-                newInfo.Add(extending);
+                newLine = extending;
             }
 
             if (mapping != string.Empty)
             {
-                newInfo.Add(mapping);
+                if (newLine != string.Empty) 
+                {
+                    newLine += " | ";
+                }
+
+                newLine += mapping;
+            }
+
+            if (newLine != string.Empty)
+            {
+                newInfo.Add(newLine);
             }
 
             Network.ControllerInfo = newInfo.ToArray();
