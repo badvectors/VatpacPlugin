@@ -1,6 +1,9 @@
-﻿using System;
+﻿using Newtonsoft.Json;
+using System;
 using System.ComponentModel.Composition;
+using System.Net.Http;
 using System.Runtime.InteropServices;
+using System.Threading.Tasks;
 using vatsys;
 using vatsys.Plugin;
 
@@ -11,6 +14,13 @@ namespace VatpacPlugin
     {
         public string Name => "VATPAC";
         public static string DisplayName => "VATPAC";
+
+        public static readonly Version Version = new Version(0, 9);
+
+        private static readonly string VersionUrl = "https://raw.githubusercontent.com/badvectors/VatpacPlugin/master/Version.json";
+
+        public static readonly HttpClient Client = new HttpClient();
+
         private static SharedState SharedState { get; set; } = new SharedState();
 
         [DllImport("kernel32.dll", SetLastError = true)]
@@ -27,7 +37,24 @@ namespace VatpacPlugin
 
             SharedState.Init();
 
+            _ = CheckVersion();
+
             // AllocConsole();
+        }
+
+        private static async Task CheckVersion()
+        {
+            try
+            {
+                var response = await Client.GetStringAsync(VersionUrl);
+
+                var version = JsonConvert.DeserializeObject<Version>(response);
+
+                if (version.Major == Version.Major && version.Minor == Version.Minor) return;
+
+                Errors.Add(new Exception("A new version of the plugin is available."), DisplayName);
+            }
+            catch { }
         }
 
         private void Network_Disconnected(object sender, EventArgs e)

@@ -8,7 +8,7 @@ namespace VatpacPlugin
     {
         private static readonly Dictionary<string, string> Mapping = new Dictionary<string, string>()
         {
-            { "ML-GUN_CTR","BIK 129.8 use 128.4" },
+            { "ML-GUN_CTR","KAT 133.5 use 128.4" },
             { "ML-BLA_CTR","ELW 123.75 use 132.2" },
             { "ML-HYD_CTR","PIY 133.9 use 118.2" },
             { "ML-MUN_CTR","YWE 134.325 use 132.6" },

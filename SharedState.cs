@@ -19,7 +19,6 @@ namespace VatpacPlugin
 {
     public class SharedState
     {
-        private readonly HttpClient _httpClient = new HttpClient();
         private readonly HashSet<string> _trackedAircraft = new HashSet<string>();
         private readonly Dictionary<string, Aircraft> _toApply = new Dictionary<string, Aircraft>();
 
@@ -41,7 +40,7 @@ namespace VatpacPlugin
 
             await GetToken();
 
-            TokenTimer.Elapsed += new ElapsedEventHandler(TokenTimer_Elasped);
+            TokenTimer.Elapsed += new ElapsedEventHandler(TokenTimer_Elapsed);
             TokenTimer.Interval = TimeSpan.FromMinutes(30).TotalMilliseconds;
             TokenTimer.AutoReset = true;
 
@@ -83,7 +82,7 @@ namespace VatpacPlugin
             await Refresh(Settings.CID);
         }
 
-        private async void TokenTimer_Elasped(object sender, ElapsedEventArgs e)
+        private async void TokenTimer_Elapsed(object sender, ElapsedEventArgs e)
         {
             await GetToken();
         }
@@ -234,7 +233,7 @@ namespace VatpacPlugin
         {
             try
             {
-                var response = await _httpClient.GetAsync($"{Server}/Aircraft");
+                var response = await Plugin.Client.GetAsync($"{Server}/Aircraft");
 
                 response.EnsureSuccessStatusCode();
 
@@ -244,6 +243,8 @@ namespace VatpacPlugin
 
                 foreach (var aircraft in existing)
                 {
+                    if (aircraft == null) continue;
+
                     _toApply.Add(aircraft.Callsign, aircraft);
                 }
             }
@@ -316,7 +317,7 @@ namespace VatpacPlugin
         {
             try
             {
-                var response = await _httpClient.PostAsync($"{Server}/Aircraft/{callsign}/State?value={state}", null);
+                var response = await Plugin.Client.PostAsync($"{Server}/Aircraft/{callsign}/State?value={state}", null);
 
                 if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized) await CheckTokenError(response);
                 
@@ -328,7 +329,7 @@ namespace VatpacPlugin
         {
             try
             {
-                var response = await _httpClient.PostAsync($"{Server}/Aircraft/{callsign}/ScratchPad?value={scratchPad}", null);
+                var response = await Plugin.Client.PostAsync($"{Server}/Aircraft/{callsign}/ScratchPad?value={scratchPad}", null);
 
                 if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized) await CheckTokenError(response);
             }
@@ -339,7 +340,7 @@ namespace VatpacPlugin
         {
             try
             {
-                var response = await _httpClient.PostAsync($"{Server}/Aircraft/{callsign}/Global?value={global}", null);
+                var response = await Plugin.Client.PostAsync($"{Server}/Aircraft/{callsign}/Global?value={global}", null);
 
                 if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized) await CheckTokenError(response);
             }
@@ -350,7 +351,7 @@ namespace VatpacPlugin
         {
             try
             {
-                var response = await _httpClient.PostAsync($"{Server}/Aircraft/{callsign}/ControllerTracking?value={controllerTracking}", null);
+                var response = await Plugin.Client.PostAsync($"{Server}/Aircraft/{callsign}/ControllerTracking?value={controllerTracking}", null);
 
                 if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized) await CheckTokenError(response);
             }
@@ -361,7 +362,7 @@ namespace VatpacPlugin
         {
             try
             {
-                var response = await _httpClient.PostAsync($"{Server}/Aircraft/{callsign}/CFLUpper?value={cflUpper}", null);
+                var response = await Plugin.Client.PostAsync($"{Server}/Aircraft/{callsign}/CFLUpper?value={cflUpper}", null);
 
                 if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized) await CheckTokenError(response);
             }
@@ -372,7 +373,7 @@ namespace VatpacPlugin
         {
             try
             {
-                var response = await _httpClient.PostAsync($"{Server}/Aircraft/{callsign}/CFLLower?value={cflLower}", null);
+                var response = await Plugin.Client.PostAsync($"{Server}/Aircraft/{callsign}/CFLLower?value={cflLower}", null);
 
                 if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized) await CheckTokenError(response);
             }
@@ -383,7 +384,7 @@ namespace VatpacPlugin
         {
             try
             {
-                var response = await _httpClient.PostAsync($"{Server}/Aircraft/{callsign}/CFLVisual?value={cflVisual}", null);
+                var response = await Plugin.Client.PostAsync($"{Server}/Aircraft/{callsign}/CFLVisual?value={cflVisual}", null);
 
                 if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized) await CheckTokenError(response);
             }
@@ -394,7 +395,7 @@ namespace VatpacPlugin
         {
             try
             {
-                var response = await _httpClient.PostAsync($"{Server}/Atc/{cid}/Login?password={password}", null);
+                var response = await Plugin.Client.PostAsync($"{Server}/Atc/{cid}/Login?password={password}", null);
 
                 response.EnsureSuccessStatusCode();
 
@@ -418,7 +419,7 @@ namespace VatpacPlugin
         {
             try
             {
-                var response = await _httpClient.PostAsync($"{Server}/Atc/{cid}/Refresh", null);
+                var response = await Plugin.    Client.PostAsync($"{Server}/Atc/{cid}/Refresh", null);
 
                 response.EnsureSuccessStatusCode();
 
@@ -442,7 +443,7 @@ namespace VatpacPlugin
         {
             try
             {
-                await _httpClient.PostAsync($"{Server}/Atc/{cid}/Logout", null);
+                await Plugin.Client.PostAsync($"{Server}/Atc/{cid}/Logout", null);
 
                 UpdateTokenOnClient();
             }
@@ -451,11 +452,11 @@ namespace VatpacPlugin
 
         private void UpdateTokenOnClient()
         {
-            _httpClient.DefaultRequestHeaders.Remove("vss-token");
+            Plugin.Client.DefaultRequestHeaders.Remove("vss-token");
 
             if (Token != null)
             {
-                _httpClient.DefaultRequestHeaders.Add("vss-token", Token.Value.ToString());
+                Plugin.Client.DefaultRequestHeaders.Add("vss-token", Token.Value.ToString());
             }
         }
 
