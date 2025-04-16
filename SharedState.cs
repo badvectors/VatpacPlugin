@@ -22,8 +22,8 @@ namespace VatpacPlugin
         private readonly HashSet<string> _trackedAircraft = new HashSet<string>();
         private readonly Dictionary<string, Aircraft> _toApply = new Dictionary<string, Aircraft>();
 
-        private readonly string Server = "http://localhost:5126/api";
-        //private readonly string Server = "https://vss.prod1.badvectors.dev/api";
+        //private readonly string Server = "http://localhost:5126/api";
+        private readonly string Server = "https://vss.prod1.badvectors.dev/api";
 
         private readonly List<string> Fields = new List<string>{ "LabelOpData", "State",
             "CFLUpper", "CFLLower", "CFLVisual", "GlobalOpData", "ControllerTracking", //"ParsedRoute" 
