@@ -12,6 +12,7 @@ namespace VatpacPlugin
             { "ML-BLA_CTR","ELW 123.75 use 132.2" },
             { "ML-HYD_CTR","PIY 133.9 use 118.2" },
             { "ML-MUN_CTR","YWE 134.325 use 132.6" },
+            { "ML-WOL_CTR","SNO 120.75 use 125.0" },
         };
 
         public static void Check()
@@ -68,7 +69,7 @@ namespace VatpacPlugin
 
             string text = string.Empty;
 
-            foreach (var item in input)
+            foreach (var item in input)  
             {
                 count++;
 
@@ -78,7 +79,7 @@ namespace VatpacPlugin
                     continue;
                 }
 
-                if (count < input.Count - 1)
+                if (count <= input.Count - 1)
                 {
                     text = $"{text}, {item}";
                     continue;

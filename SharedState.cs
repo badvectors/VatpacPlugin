@@ -22,8 +22,8 @@ namespace VatpacPlugin
         private readonly HashSet<string> _trackedAircraft = new HashSet<string>();
         private readonly Dictionary<string, Aircraft> _toApply = new Dictionary<string, Aircraft>();
 
-        //private readonly string Server = "http://localhost:5126/api";
-        private readonly string Server = "https://vss.prod1.badvectors.dev/api";
+        private readonly string Server = "http://localhost:5126/api";
+        //private readonly string Server = "https://vss.prod1.badvectors.dev/api";
 
         private readonly List<string> Fields = new List<string>{ "LabelOpData", "State",
             "CFLUpper", "CFLLower", "CFLVisual", "GlobalOpData", "ControllerTracking", //"ParsedRoute" 
@@ -395,7 +395,10 @@ namespace VatpacPlugin
         {
             try
             {
-                var response = await Plugin.Client.PostAsync($"{Server}/Atc/{cid}/Login?password={password}", null);
+                var login = new Login(cid, password);
+
+                var response = await Plugin.Client.PostAsync($"{Server}/Atc/{cid}/Login", 
+                    new StringContent(JsonConvert.SerializeObject(login), Encoding.UTF8, "application/json"));
 
                 response.EnsureSuccessStatusCode();
 
@@ -419,7 +422,7 @@ namespace VatpacPlugin
         {
             try
             {
-                var response = await Plugin.    Client.PostAsync($"{Server}/Atc/{cid}/Refresh", null);
+                var response = await Plugin.Client.PostAsync($"{Server}/Atc/{cid}/Refresh", null);
 
                 response.EnsureSuccessStatusCode();
 

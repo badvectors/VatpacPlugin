@@ -61,6 +61,7 @@
     <Compile Include="Aircraft.cs" />
     <Compile Include="Atc.cs" />
     <Compile Include="Extending.cs" />
+    <Compile Include="Login.cs" />
     <Compile Include="Plugin.cs" />
     <Compile Include="Position.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
@@ -79,7 +80,9 @@
       <Generator>SettingsSingleFileGenerator</Generator>
       <LastGenOutput>Settings.Designer.cs</LastGenOutput>
     </None>
-    <None Include="Version.json" />
+    <None Include="Version.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <Reference Include="Newtonsoft.Json, Version=13.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
