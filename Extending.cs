@@ -8,8 +8,7 @@ namespace VatpacPlugin
     {
         private static readonly Dictionary<string, string> Mapping = new Dictionary<string, string>()
         {
-            //{ "ML-GUN_CTR","KAT 133.5 use 128.4" },
-            //{ "ML-BLA_CTR","ELW 123.75 use 132.2" },
+            { "BN-KPL_CTR","CVN 133.8 and SWY 133.2 use 125.9" }
         };
 
         public static void Check()

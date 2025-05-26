@@ -15,7 +15,7 @@ namespace VatpacPlugin
         public string Name => "VATPAC";
         public static string DisplayName => "VATPAC";
 
-        public static readonly Version Version = new Version(0, 13);
+        public static readonly Version Version = new Version(0, 14);
 
         private static readonly string VersionUrl = "https://raw.githubusercontent.com/badvectors/VatpacPlugin/master/Version.json";
 
