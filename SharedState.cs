@@ -33,6 +33,7 @@ namespace VatpacPlugin
         private DateTime? ExpiryUtc = null;
         private Timer TokenTimer = new Timer();
         private Settings Settings = null;
+        private bool IsSweatbox = !Network.IsOfficialServer;
 
         public async void Init()
         {
@@ -91,8 +92,6 @@ namespace VatpacPlugin
         {
             if (!Network.IsValidATC) return;
 
-            if (!Network.IsOfficialServer) return;
-
             if (_trackedAircraft.Contains(updated.Callsign)) return;
 
             _trackedAircraft.Add(updated.Callsign);
@@ -103,8 +102,6 @@ namespace VatpacPlugin
         public void OnRadarUpdate(RDP.RadarTrack updated)
         {
             if (!Network.IsValidATC) return;
-
-            if (!Network.IsOfficialServer) return;
 
             if (updated.ActualAircraft == null) return;
 
@@ -173,7 +170,7 @@ namespace VatpacPlugin
                 return;
             }
 
-            _toApply.Remove(callsign);
+            //_toApply.Remove(callsign);
         }
 
         private async void Fdr_PropertyChanged(object sender, PropertyChangedEventArgs e)
@@ -233,7 +230,7 @@ namespace VatpacPlugin
         {
             try
             {
-                var response = await Plugin.Client.GetAsync($"{Server}/Aircraft");
+                var response = await Plugin.Client.GetAsync($"{Server}/Aircraft?isSweatbox={IsSweatbox}");
 
                 response.EnsureSuccessStatusCode();
 
@@ -317,7 +314,7 @@ namespace VatpacPlugin
         {
             try
             {
-                var response = await Plugin.Client.PostAsync($"{Server}/Aircraft/{callsign}/State?value={state}", null);
+                var response = await Plugin.Client.PostAsync($"{Server}/Aircraft/{callsign}/State?value={state}&isSweatbox={IsSweatbox}", null);
 
                 if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized) await CheckTokenError(response);
                 
@@ -329,7 +326,7 @@ namespace VatpacPlugin
         {
             try
             {
-                var response = await Plugin.Client.PostAsync($"{Server}/Aircraft/{callsign}/ScratchPad?value={scratchPad}", null);
+                var response = await Plugin.Client.PostAsync($"{Server}/Aircraft/{callsign}/ScratchPad?value={scratchPad}&isSweatbox={IsSweatbox}", null);
 
                 if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized) await CheckTokenError(response);
             }
@@ -340,7 +337,7 @@ namespace VatpacPlugin
         {
             try
             {
-                var response = await Plugin.Client.PostAsync($"{Server}/Aircraft/{callsign}/Global?value={global}", null);
+                var response = await Plugin.Client.PostAsync($"{Server}/Aircraft/{callsign}/Global?value={global}&isSweatbox={IsSweatbox}", null);
 
                 if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized) await CheckTokenError(response);
             }
@@ -351,7 +348,7 @@ namespace VatpacPlugin
         {
             try
             {
-                var response = await Plugin.Client.PostAsync($"{Server}/Aircraft/{callsign}/ControllerTracking?value={controllerTracking}", null);
+                var response = await Plugin.Client.PostAsync($"{Server}/Aircraft/{callsign}/ControllerTracking?value={controllerTracking}&isSweatbox={IsSweatbox}", null);
 
                 if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized) await CheckTokenError(response);
             }
@@ -362,7 +359,7 @@ namespace VatpacPlugin
         {
             try
             {
-                var response = await Plugin.Client.PostAsync($"{Server}/Aircraft/{callsign}/CFLUpper?value={cflUpper}", null);
+                var response = await Plugin.Client.PostAsync($"{Server}/Aircraft/{callsign}/CFLUpper?value={cflUpper}&isSweatbox={IsSweatbox}", null);
 
                 if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized) await CheckTokenError(response);
             }
@@ -373,7 +370,7 @@ namespace VatpacPlugin
         {
             try
             {
-                var response = await Plugin.Client.PostAsync($"{Server}/Aircraft/{callsign}/CFLLower?value={cflLower}", null);
+                var response = await Plugin.Client.PostAsync($"{Server}/Aircraft/{callsign}/CFLLower?value={cflLower}&isSweatbox={IsSweatbox}", null);
 
                 if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized) await CheckTokenError(response);
             }
@@ -384,7 +381,7 @@ namespace VatpacPlugin
         {
             try
             {
-                var response = await Plugin.Client.PostAsync($"{Server}/Aircraft/{callsign}/CFLVisual?value={cflVisual}", null);
+                var response = await Plugin.Client.PostAsync($"{Server}/Aircraft/{callsign}/CFLVisual?value={cflVisual}&isSweatbox={IsSweatbox}", null);
 
                 if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized) await CheckTokenError(response);
             }

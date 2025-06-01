@@ -1,6 +1,5 @@
 ﻿using Newtonsoft.Json;
 using System;
-using System.Collections.Generic;
 
 namespace VatpacPlugin
 {
@@ -8,6 +7,9 @@ namespace VatpacPlugin
     {
         [JsonProperty(PropertyName = "callsign")] 
         public string Callsign { get; private set; }
+
+        [JsonProperty(PropertyName = "isSweatbox")]
+        public string IsSweatbox { get; private set; }
 
         [JsonProperty(PropertyName = "state")]
         public string State { get; private set; }
