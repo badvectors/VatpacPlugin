@@ -15,7 +15,7 @@ namespace VatpacPlugin
         public string Name => "VATPAC";
         public static string DisplayName => "VATPAC";
 
-        public static readonly Version Version = new Version(0, 15);
+        public static readonly Version Version = new Version(0, 16);
 
         private static readonly string VersionUrl = "https://raw.githubusercontent.com/badvectors/VatpacPlugin/master/Version.json";
 
@@ -39,7 +39,7 @@ namespace VatpacPlugin
 
             _ = CheckVersion();
 
-            // AllocConsole();
+            AllocConsole();
         }
 
         private static async Task CheckVersion()
