@@ -15,7 +15,7 @@ namespace VatpacPlugin
         public string Name => "VATPAC";
         public static string DisplayName => "VATPAC";
 
-        public static readonly Version Version = new Version(0, 16);
+        public static readonly Version Version = new Version(0, 18);
 
         private static readonly string VersionUrl = "https://raw.githubusercontent.com/badvectors/VatpacPlugin/master/Version.json";
 
@@ -35,11 +35,11 @@ namespace VatpacPlugin
             Network.Connected += Network_Connected;
             Network.Disconnected += Network_Disconnected;
 
-            SharedState.Init();
+            //SharedState.Init();
 
             _ = CheckVersion();
 
-            AllocConsole();
+            // AllocConsole();
         }
 
         private static async Task CheckVersion()
@@ -59,12 +59,12 @@ namespace VatpacPlugin
 
         private void Network_Disconnected(object sender, EventArgs e)
         {
-            SharedState.Disconnected();
+            //SharedState.Disconnected();
         }
 
         private async void Network_Connected(object sender, EventArgs e)
         {
-            await SharedState.Connected();
+            //await SharedState.Connected();
         }
 
         private void Audio_VSCSFrequenciesChanged(object sender, EventArgs e)
@@ -74,12 +74,12 @@ namespace VatpacPlugin
 
         public void OnFDRUpdate(FDP2.FDR updated)
         {
-            SharedState.OnFdrUpdate(updated);
+            //SharedState.OnFdrUpdate(updated);
         }
 
         public void OnRadarTrackUpdate(RDP.RadarTrack updated)
         {
-            SharedState.OnRadarUpdate(updated);
+            //SharedState.OnRadarUpdate(updated);
         }
     }
 }

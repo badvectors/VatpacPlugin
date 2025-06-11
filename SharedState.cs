@@ -19,7 +19,7 @@ namespace VatpacPlugin
 {
     public class SharedState
     {
-        private bool Testing = true;
+        private bool Testing = false;
 
         private readonly HashSet<string> _trackedAircraft = new HashSet<string>();
         private readonly Dictionary<string, Aircraft> _toApply = new Dictionary<string, Aircraft>();
