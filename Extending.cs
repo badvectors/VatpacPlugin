@@ -8,7 +8,7 @@ namespace VatpacPlugin
     {
         private static readonly Dictionary<string, string> Mapping = new Dictionary<string, string>()
         {
-            { "BN-KPL_CTR","CVN 133.8 and SWY 133.2 use 125.9" }
+            //{ "BN-KPL_CTR","CVN 133.8 and SWY 133.2 use 125.9" }
         };
 
         public static void Check()
