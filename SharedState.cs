@@ -127,8 +127,6 @@ namespace VatpacPlugin
                     elapsed += 1000;
                     if (elapsed > 10000) return;
                 }
-
-                ApplySharedState(aircraft, fdr);
             }
 
             //  CONTROLLED
@@ -139,6 +137,11 @@ namespace VatpacPlugin
             {
                 MMI.AcceptJurisdiction(fdr);
             }
+
+            // SHARED STATE
+            if (fdr.ControllerTracking != null && !fdr.IsTrackedByMe) return;
+
+            ApplySharedState(aircraft, fdr);
         }
 
         private void Depart(Aircraft aircraft, FDR fdr)
