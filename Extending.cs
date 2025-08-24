@@ -11,7 +11,38 @@ namespace VatpacPlugin
             //{ "BN-KPL_CTR","CVN 133.8 and SWY 133.2 use 125.9" }
         };
 
-        public static void Check()
+        public static void CheckApproach()
+        {
+            if (!Network.Me.Callsign.EndsWith("_APP")) return;
+
+            var extending = new List<string>();
+
+            foreach (var frequency in Audio.VSCSFrequencies)
+            {
+                if (!frequency.Transmit) continue;
+
+                if (!frequency.Name.EndsWith("_APP")) continue;
+
+                if (frequency.Name == Network.Me.Callsign) continue;
+
+                if (frequency.Name.Length < 6) continue;
+
+                var shortName = $"{frequency.Name.Replace("_APP", "").Substring(0, 2)}A";
+
+                extending.Add($"{shortName} {Conversions.FrequencyToString(frequency.Frequency)}");
+            }
+
+            var extendingText = string.Empty;
+
+            if (extending.Any())
+            {
+                extendingText = $"Extending {DoText(extending)}";
+            }
+
+            UpdateInfo(extendingText, string.Empty);
+        }
+
+        public static void CheckEnroute()
         {
             if (!Network.Me.Callsign.EndsWith("_CTR")) return;
 

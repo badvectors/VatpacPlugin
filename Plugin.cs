@@ -12,10 +12,12 @@ namespace VatpacPlugin
     [Export(typeof(IPlugin))]
     public class Plugin : IPlugin
     {
+        public static bool Testing = false;
+
         public string Name => "VATPAC";
         public static string DisplayName => "VATPAC";
 
-        public static readonly Version Version = new Version(0, 19);
+        public static readonly Version Version = new Version(0, 20);
 
         private static readonly string VersionUrl = "https://raw.githubusercontent.com/badvectors/VatpacPlugin/master/Version.json";
 
@@ -35,11 +37,14 @@ namespace VatpacPlugin
             Network.Connected += Network_Connected;
             Network.Disconnected += Network_Disconnected;
 
-            //SharedState.Init();
+            _ = SharedState.Init();
 
             _ = CheckVersion();
 
-            // AllocConsole();
+            if (Testing)
+            {
+                AllocConsole();
+            }
         }
 
         private static async Task CheckVersion()
@@ -59,27 +64,28 @@ namespace VatpacPlugin
 
         private void Network_Disconnected(object sender, EventArgs e)
         {
-            //SharedState.Disconnected();
+            SharedState.Disconnected();
         }
 
-        private async void Network_Connected(object sender, EventArgs e)
+        private void Network_Connected(object sender, EventArgs e)
         {
-            //await SharedState.Connected();
+            SharedState.Connected();
         }
 
         private void Audio_VSCSFrequenciesChanged(object sender, EventArgs e)
         {
-            Extending.Check();
+            Extending.CheckEnroute();
+            Extending.CheckApproach();
         }
 
         public void OnFDRUpdate(FDP2.FDR updated)
         {
-            //SharedState.OnFdrUpdate(updated);
+            SharedState.OnFdrUpdate(updated);
         }
 
-        public void OnRadarTrackUpdate(RDP.RadarTrack updated)
+        public async void OnRadarTrackUpdate(RDP.RadarTrack updated)
         {
-            //SharedState.OnRadarUpdate(updated);
+            await SharedState.OnRadarUpdate(updated);
         }
     }
 }

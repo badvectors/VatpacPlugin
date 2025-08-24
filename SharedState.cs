@@ -8,6 +8,7 @@ using System.Linq;
 using System.Net.Http;
 using System.Security.Cryptography;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Timers;
 using System.Xml;
@@ -19,28 +20,28 @@ namespace VatpacPlugin
 {
     public class SharedState
     {
-        private bool Testing = false;
 
         private readonly HashSet<string> _trackedAircraft = new HashSet<string>();
-        private readonly Dictionary<string, Aircraft> _toApply = new Dictionary<string, Aircraft>();
+        private readonly HashSet<string> _processedAircraft = new HashSet<string>();
 
         private readonly string TestingServer = "http://localhost:5126/api";
         private readonly string ProductionServer = "https://vss.prod1.badvectors.dev/api";
-        private string Server => Testing ? TestingServer : ProductionServer;
+        private string Server => Plugin.Testing ? TestingServer : ProductionServer;
 
         private readonly List<string> Fields = new List<string>{ "LabelOpData", "State",
             "CFLUpper", "CFLLower", "CFLVisual", "GlobalOpData", "ControllerTracking", "ParsedRoute", "ATD"
         };
 
+        private List<string> _callsigns = new List<string>();
+
         private Guid? Token = null;
         private DateTime? ExpiryUtc = null;
         private Timer TokenTimer = new Timer();
-        private Timer ApplyTimer = new Timer();
-        private Timer LogonTimer = new Timer();
-        private Settings Settings = null;
-        private bool IsSweatbox = !Network.IsOfficialServer;
 
-        public async void Init()
+        private Settings Settings = null;
+        private bool IsSweatbox = false;
+
+        public async Task Init()
         {
             GetSettings();
 
@@ -51,33 +52,25 @@ namespace VatpacPlugin
             TokenTimer.AutoReset = true;
 
             TokenTimer.Start();
-
-            ApplyTimer.Elapsed += new ElapsedEventHandler(ApplyTimer_Elapsed);
-            ApplyTimer.Interval = TimeSpan.FromSeconds(1).TotalMilliseconds;
-            ApplyTimer.AutoReset = false;
-
-            LogonTimer.Interval = TimeSpan.FromSeconds(30).TotalMilliseconds;
-            LogonTimer.AutoReset = false;
         }
 
-        public async Task Connected()
+        public void Connected()
         {
-            await GetExisting();
-
-            LogonTimer.Start();
-
-            ApplyTimer.Start();
+            var sector = SectorsVolumes.Sectors.FirstOrDefault(x => x.Callsign == Network.Me.Callsign);
+            if (sector == null) return;
+            foreach (var subsector in sector.SubSectors)
+            {
+                _callsigns.Add(subsector.Callsign);
+            }
+            IsSweatbox = !Network.IsOfficialServer;
         }
 
         public void Disconnected()
         {
+            _callsigns.Clear();
             _trackedAircraft.Clear();
-
-            _toApply.Clear();
-
-            ApplyTimer.Stop();
-
-            LogonTimer.Stop();
+            _processedAircraft.Clear();
+            IsSweatbox = false;
         }
 
         private async Task GetToken()
@@ -108,112 +101,43 @@ namespace VatpacPlugin
             await GetToken();
         }
 
-        private void ApplyTimer_Elapsed(object sender, ElapsedEventArgs e)
-        {
-            if (!Network.IsValidATC) return;
-
-            Console.WriteLine("Apply timer fired.");
-
-            foreach (var fdr in FDP2.GetFDRs)
-            {
-                var success = _toApply.TryGetValue(fdr.Callsign, out var aircraft);
-
-                if (!success) continue;
-
-                Apply(aircraft, fdr);
-            }
-
-            if (!LogonTimer.Enabled)
-            {
-                Console.WriteLine("Logon time disabled. Stopping apply timer.");
-
-                return;
-            }
-
-            ApplyTimer.Start();
-        }
-
         private void Apply(Aircraft aircraft, FDR fdr)
         {
-            Console.WriteLine($"APPLY: {aircraft.Callsign}");
+            Console.WriteLine($"APPLYING {aircraft.Callsign}");
 
-            //if (fdr.ProcessPending) return;
-
-            // COORDINATED
-            if (aircraft.State == "STATE_COORDINATED")
-            {
-                if (fdr.ATD == DateTime.MaxValue && aircraft.Positions != null)
-                {
-                    Depart(aircraft, fdr);
-
-                    return;
-                }
-
-                if (!fdr.ESTed)
-                {
-                    MMI.EstFDR(fdr);
-
-                    return;
-                }
-
-                ApplySharedState(aircraft, fdr);
-
-                _toApply.Remove(fdr.Callsign);
-
-                return;
-            }
-
-            //  UNCONTROLLED 
-            if (aircraft.State == "STATE_UNCONTROLLED")
+            // COORDINATED && UNCONTROLLED && CONTROLLED
+            if (aircraft.State == "STATE_COORDINATED" || 
+                aircraft.State == "STATE_UNCONTROLLED" ||
+                aircraft.State == "STATE_CONTROLLED")
             {
                 if (fdr.ATD == DateTime.MaxValue)
                 {
                     Depart(aircraft, fdr);
-
-                    return;
                 }
 
                 if (!fdr.ESTed)
                 {
                     MMI.EstFDR(fdr);
+                }
 
-                    return;
+                int elapsed = 0;
+                while (fdr.CoupledTrack == null)
+                {
+                    Thread.Sleep(1000);
+                    elapsed += 1000;
+                    if (elapsed > 10000) return;
                 }
 
                 ApplySharedState(aircraft, fdr);
-
-                _toApply.Remove(aircraft.Callsign);
-
-                return;
             }
 
             //  CONTROLLED
-            if (aircraft.State == "STATE_CONTROLLED")
+            if (aircraft.State == "STATE_CONTROLLED" &&
+                fdr.ControllerTracking == null &&
+                aircraft.LastController != null &&
+                _callsigns.Contains(aircraft.LastController))
             {
-                if (fdr.ATD == DateTime.MaxValue)
-                {
-                    Depart(aircraft, fdr);
-
-                    return;
-                }
-
-                if (!fdr.ESTed)
-                {
-                    MMI.EstFDR(fdr);
-
-                    return;
-                }
-
-                ApplySharedState(aircraft, fdr);
-
-                if (aircraft.LastController != null && aircraft.LastController == Network.Me.Callsign)
-                {
-                    MMI.AcceptJurisdiction(fdr);
-                }
-
-                _toApply.Remove(aircraft.Callsign);
-
-                return;
+                MMI.AcceptJurisdiction(fdr);
             }
         }
 
@@ -232,16 +156,34 @@ namespace VatpacPlugin
         {
             if (!Network.IsValidATC) return;
 
+            if (!_processedAircraft.Contains(updated.Callsign)) return;
+
             if (_trackedAircraft.Contains(updated.Callsign)) return;
 
             _trackedAircraft.Add(updated.Callsign);
 
+            Console.WriteLine($"TRACKING {updated.Callsign}");
+
             updated.PropertyChanged += Fdr_PropertyChanged;
         }
 
-        public void OnRadarUpdate(RDP.RadarTrack updated)
+        public async Task OnRadarUpdate(RDP.RadarTrack updated)
         {
-            //_toApply.Remove(callsign);
+            if (updated.ActualAircraft == null) return;
+
+            if (_processedAircraft.Contains(updated.ActualAircraft.Callsign)) return;
+
+            var fdr = FDP2.GetFDRs.FirstOrDefault(x => x.Callsign == updated.ActualAircraft.Callsign);
+
+            if (fdr == null) return;
+
+            _processedAircraft.Add(updated.ActualAircraft.Callsign);
+
+            var aircraft = await GetSharedState(updated.ActualAircraft.Callsign);
+
+            if (aircraft == null) return;
+
+            await Task.Run(() => Apply(aircraft, fdr));
         }
 
         private async void Fdr_PropertyChanged(object sender, PropertyChangedEventArgs e)
@@ -261,14 +203,14 @@ namespace VatpacPlugin
                     await SendATD(fdr.Callsign, fdr.ATD);
                     break;
                 case "ParsedRoute":
-                    var positions = new List<Position>();
-                    foreach (var point in fdr.ParsedRoute)
-                    {
-                        if (!point.IsPETO) continue;
-                        positions.Add(new Position(point.Intersection.Name, point.ETO, point.ATO, point.SETO, point.MPRArmed));
-                    }
-                    if (!positions.Any()) break;
-                    await SendPositions(fdr.Callsign, positions);
+                    //var positions = new List<Position>();
+                    //foreach (var point in fdr.ParsedRoute)
+                    //{
+                    //    if (!point.IsPETO) continue;
+                    //    positions.Add(new Position(point.Intersection.Name, point.ETO, point.ATO, point.SETO, point.MPRArmed));
+                    //}
+                    //if (!positions.Any()) break;
+                    //await SendPositions(fdr.Callsign, positions);
                     break;
                 case "State":
                     Console.WriteLine($"{fdr.Callsign} {e.PropertyName} {fdr.State}");
@@ -291,9 +233,11 @@ namespace VatpacPlugin
                     await SendCFLVisual(fdr.Callsign, fdr.CFLVisual);
                     break;
                 case "LabelOpData":
+                    Console.WriteLine($"{fdr.Callsign} {e.PropertyName} {fdr.LabelOpData}");
                     await SendScratchPad(fdr.Callsign, fdr.LabelOpData);
                     break;
                 case "GlobalOpData":
+                    Console.WriteLine($"{fdr.Callsign} {e.PropertyName} {fdr.GlobalOpData}");
                     await SendGlobal(fdr.Callsign, fdr.GlobalOpData);
                     break;
                 default:
@@ -302,26 +246,25 @@ namespace VatpacPlugin
 
         }
 
-        private async Task GetExisting()
+        private async Task<Aircraft> GetSharedState(string callsign)
         {
+            Console.WriteLine($"FETCHING {callsign}");
             try
             {
-                var response = await Plugin.Client.GetAsync($"{Server}/Aircraft?isSweatbox={IsSweatbox}");
+                var response = await Plugin.Client.GetAsync($"{Server}/Aircraft/{callsign}?isSweatbox={IsSweatbox}");
 
                 response.EnsureSuccessStatusCode();
 
                 var content = await response.Content.ReadAsStringAsync();
 
-                var existing = JsonConvert.DeserializeObject<List<Aircraft>>(content);
+                var aircraft  = JsonConvert.DeserializeObject<Aircraft>(content);
 
-                foreach (var aircraft in existing)
-                {
-                    if (aircraft == null) continue;
-
-                    _toApply.Add(aircraft.Callsign, aircraft);
-                }
+                return aircraft;
             }
-            catch { }
+            catch 
+            {
+                return null;
+            }
         }
 
         private void ApplySharedState(Aircraft aircraft, FDP2.FDR fdr)
@@ -503,7 +446,7 @@ namespace VatpacPlugin
             }
             catch (Exception e) 
             {
-                Errors.Add(new Exception($"Could login: {e.Message}"), Plugin.DisplayName);
+                Errors.Add(new Exception($"Couldn't login: {e.Message}"), Plugin.DisplayName);
             }
         }
 
@@ -527,7 +470,7 @@ namespace VatpacPlugin
             }
             catch (Exception e)
             {
-                Errors.Add(new Exception($"Could refresh token: {e.Message}"), Plugin.DisplayName);
+                Errors.Add(new Exception($"Couldn't refresh token: {e.Message}"), Plugin.DisplayName);
             }
         }
 
