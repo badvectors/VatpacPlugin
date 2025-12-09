@@ -1,10 +1,7 @@
-﻿using Newtonsoft.Json;
-using System;
+﻿using System;
 using System.ComponentModel.Composition;
-using System.Linq;
 using System.Net.Http;
 using System.Runtime.InteropServices;
-using System.Threading.Tasks;
 using vatsys;
 using vatsys.Plugin;
 
@@ -17,8 +14,6 @@ namespace VatpacPlugin
         public static bool StateSavingDisabled = true;
         public string Name => "VATPAC";
         public static string DisplayName => "VATPAC";
-
-        public static readonly Version Version = new Version(1, 21);
 
         public static readonly HttpClient Client = new HttpClient();
         private static SharedState SharedState { get; set; } = new SharedState();
