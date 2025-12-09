@@ -1,6 +1,7 @@
 ﻿using Newtonsoft.Json;
 using System;
 using System.ComponentModel.Composition;
+using System.Linq;
 using System.Net.Http;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
@@ -13,16 +14,13 @@ namespace VatpacPlugin
     public class Plugin : IPlugin
     {
         public static bool Testing = false;
-
+        public static bool StateSavingDisabled = true;
         public string Name => "VATPAC";
         public static string DisplayName => "VATPAC";
 
-        public static readonly Version Version = new Version(0, 21);
-
-        private static readonly string VersionUrl = "https://raw.githubusercontent.com/badvectors/VatpacPlugin/master/Version.json";
+        public static readonly Version Version = new Version(1, 21);
 
         public static readonly HttpClient Client = new HttpClient();
-
         private static SharedState SharedState { get; set; } = new SharedState();
 
         [DllImport("kernel32.dll", SetLastError = true)]
@@ -37,38 +35,24 @@ namespace VatpacPlugin
             Network.Connected += Network_Connected;
             Network.Disconnected += Network_Disconnected;
 
-            _ = SharedState.Init();
-
-            _ = CheckVersion();
-
             if (Testing)
             {
                 AllocConsole();
             }
+
+            if (StateSavingDisabled) return;
+
+            _ = SharedState.Init();
         }
-
-        private static async Task CheckVersion()
-        {
-            try
-            {
-                var response = await Client.GetStringAsync(VersionUrl);
-
-                var version = JsonConvert.DeserializeObject<Version>(response);
-
-                if (version.Major == Version.Major && version.Minor == Version.Minor) return;
-
-                Errors.Add(new Exception("A new version of the plugin is available."), DisplayName);
-            }
-            catch { }
-        }
-
         private void Network_Disconnected(object sender, EventArgs e)
         {
+            if (StateSavingDisabled) return;
             SharedState.Disconnected();
         }
 
         private void Network_Connected(object sender, EventArgs e)
         {
+            if (StateSavingDisabled) return;
             SharedState.Connected();
         }
 
@@ -76,15 +60,18 @@ namespace VatpacPlugin
         {
             Extending.CheckEnroute();
             Extending.CheckApproach();
+            Sectors.CheckActive();
         }
 
         public void OnFDRUpdate(FDP2.FDR updated)
         {
+            if (StateSavingDisabled) return;
             SharedState.OnFdrUpdate(updated);
         }
 
         public async void OnRadarTrackUpdate(RDP.RadarTrack updated)
         {
+            if (StateSavingDisabled) return;
             await SharedState.OnRadarUpdate(updated);
         }
     }
