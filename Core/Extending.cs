@@ -11,6 +11,12 @@ namespace VatpacPlugin
             //{ "BN-KPL_CTR","CVN 133.8 and SWY 133.2 use 125.9" }
         };
 
+        private static readonly Dictionary<string, string> App = new Dictionary<string, string>()
+        {
+            { "BN-C_APP", "123.50" },
+            { "N", "123.50" },
+        };
+
         public static void CheckApproach()
         {
             if (!Network.Me.Callsign.EndsWith("_APP")) return;
@@ -21,15 +27,15 @@ namespace VatpacPlugin
             {
                 if (!frequency.Transmit) continue;
 
-                if (!frequency.Name.EndsWith("_APP")) continue;
+                if (!frequency.Name.EndsWith("_APP") && !frequency.Name.EndsWith("_DEP")) continue;
 
                 if (frequency.Name == Network.Me.Callsign) continue;
 
-                if (frequency.Name.Length < 6) continue;
+                var sector = SectorsVolumes.Sectors.FirstOrDefault(x => x.Callsign == frequency.Name);
 
-                var shortName = $"{frequency.Name.Replace("_APP", "").Substring(0, 2)}A";
+                if (sector == null) continue;
 
-                extending.Add($"{shortName} {Conversions.FrequencyToString(frequency.Frequency)}");
+                extending.Add($"{sector.Name} {Conversions.FrequencyToString(frequency.Frequency)}");
             }
 
             var extendingText = string.Empty;
