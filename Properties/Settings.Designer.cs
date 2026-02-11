@@ -34,5 +34,29 @@ namespace VatpacPlugin.Properties {
                 this["Callsign"] = value;
             }
         }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("0")]
+        public int MumbleStatusOffsetX {
+            get {
+                return ((int)(this["MumbleStatusOffsetX"]));
+            }
+            set {
+                this["MumbleStatusOffsetX"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("0")]
+        public int MumbleStatusOffsetY {
+            get {
+                return ((int)(this["MumbleStatusOffsetY"]));
+            }
+            set {
+                this["MumbleStatusOffsetY"] = value;
+            }
+        }
     }
 }

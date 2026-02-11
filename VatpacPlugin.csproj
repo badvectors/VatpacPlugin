@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
   <PropertyGroup>
@@ -19,7 +19,7 @@
     <DebugSymbols>true</DebugSymbols>
     <DebugType>full</DebugType>
     <Optimize>false</Optimize>
-    <OutputPath>..\..\..\..\OneDrive\Documents\vatSys Files\Profiles\Australia\Plugins\Vatpac\</OutputPath>
+    <OutputPath>..\..\vatSys Files\Profiles\Australia\Plugins\VatpacPlugin\</OutputPath>
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
@@ -58,21 +58,30 @@
     <SignAssembly>false</SignAssembly>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="Aircraft.cs" />
-    <Compile Include="Atc.cs" />
-    <Compile Include="Extending.cs" />
-    <Compile Include="Login.cs" />
-    <Compile Include="Plugin.cs" />
-    <Compile Include="Position.cs" />
+    <Compile Include="Core\DiscordLogger.cs" />
+    <Compile Include="Core\Plugin.cs" />
+    <Compile Include="Core\Extending.cs" />
+    <Compile Include="Core\Login.cs" />
+    <Compile Include="Core\Settings.cs" />
+    <Compile Include="Core\SharedState.cs" />
+    <Compile Include="Models\Aircraft.cs" />
+    <Compile Include="Models\Atc.cs" />
+    <Compile Include="Models\Position.cs" />
+    <Compile Include="Models\Sectors.cs" />
+    <Compile Include="Mumble\AudioReconnect.cs" />
+    <Compile Include="Mumble\MenuInjector.cs" />
+    <Compile Include="Components\MumbleStatusForm.cs">
+      <SubType>designer</SubType>
+    </Compile>
+    <Compile Include="Components\MumbleStatusForm.Designer.cs">
+      <DependentUpon>MumbleStatusForm.cs</DependentUpon>
+    </Compile>
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Properties\Settings.Designer.cs">
       <AutoGen>True</AutoGen>
       <DesignTimeSharedInput>True</DesignTimeSharedInput>
       <DependentUpon>Settings.settings</DependentUpon>
     </Compile>
-    <Compile Include="Sectors.cs" />
-    <Compile Include="Settings.cs" />
-    <Compile Include="SharedState.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="app.config" />
@@ -86,11 +95,25 @@
     <Reference Include="Newtonsoft.Json, Version=13.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
       <HintPath>packages\Newtonsoft.Json.13.0.3\lib\net45\Newtonsoft.Json.dll</HintPath>
     </Reference>
+    <Reference Include="SharpDX, Version=4.2.0.0, Culture=neutral, PublicKeyToken=b4dcf0f35e5521f1, processorArchitecture=MSIL">
+      <HintPath>packages\SharpDX.4.2.0\lib\net45\SharpDX.dll</HintPath>
+    </Reference>
+    <Reference Include="SharpDX.Direct2D1, Version=4.2.0.0, Culture=neutral, PublicKeyToken=b4dcf0f35e5521f1, processorArchitecture=MSIL">
+      <HintPath>packages\SharpDX.Direct2D1.4.2.0\lib\net45\SharpDX.Direct2D1.dll</HintPath>
+    </Reference>
+    <Reference Include="SharpDX.Direct3D11, Version=4.2.0.0, Culture=neutral, PublicKeyToken=b4dcf0f35e5521f1, processorArchitecture=MSIL">
+      <HintPath>packages\SharpDX.Direct3D11.4.2.0\lib\net45\SharpDX.Direct3D11.dll</HintPath>
+    </Reference>
+    <Reference Include="SharpDX.DXGI, Version=4.2.0.0, Culture=neutral, PublicKeyToken=b4dcf0f35e5521f1, processorArchitecture=MSIL">
+      <HintPath>packages\SharpDX.DXGI.4.2.0\lib\net45\SharpDX.DXGI.dll</HintPath>
+    </Reference>
     <Reference Include="System" />
     <Reference Include="System.ComponentModel.Composition" />
     <Reference Include="System.Configuration" />
+    <Reference Include="System.Drawing" />
     <Reference Include="System.Net.Http" />
     <Reference Include="System.Security" />
+    <Reference Include="System.Windows.Forms" />
     <Reference Include="System.Xml" />
     <Reference Include="vatSys">
       <Private>false</Private>
@@ -99,6 +122,11 @@
   </ItemGroup>
   <ItemGroup>
     <WCFMetadata Include="Connected Services\" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Components\MumbleStatusForm.resx">
+      <DependentUpon>MumbleStatusForm.cs</DependentUpon>
+    </EmbeddedResource>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

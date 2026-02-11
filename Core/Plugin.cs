@@ -35,6 +35,9 @@ namespace VatpacPlugin
                 AllocConsole();
             }
 
+            MenuInjector.Init();
+            AudioReconnect.Init();
+
             if (StateSavingDisabled) return;
 
             _ = SharedState.Init();

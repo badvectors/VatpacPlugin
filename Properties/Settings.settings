@@ -5,5 +5,11 @@
     <Setting Name="Callsign" Type="System.String" Scope="User">
       <Value Profile="(Default)">callsign</Value>
     </Setting>
+    <Setting Name="MumbleStatusOffsetX" Type="System.Int32" Scope="User">
+      <Value Profile="(Default)">0</Value>
+    </Setting>
+    <Setting Name="MumbleStatusOffsetY" Type="System.Int32" Scope="User">
+      <Value Profile="(Default)">0</Value>
+    </Setting>
   </Settings>
 </SettingsFile>
