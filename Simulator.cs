@@ -30,6 +30,9 @@ namespace VatpacPlugin
         /// <summary>Whether ConnectedServer answers vatSys's frequency lookups - what VscsFrequencies goes by. False while there isn't one, and for a server too old to say.</summary>
         public static bool Frequencies { get; private set; }
 
+        /// <summary>ConnectedServer's METARs as of the last poll, ICAO to raw text - what MetarRefresh goes by. Null while there isn't one, and for a server too old to say.</summary>
+        public static Dictionary<string, string> Metars { get; private set; }
+
         /// <summary>
         /// What the last poll found, for the Simulator page to show. Every one of these except Paused
         /// and Running is a reason nothing will freeze, and the point of surfacing it is that they are
@@ -153,6 +156,7 @@ namespace VatpacPlugin
             try { RadarFreeze.Apply(false); } catch { }
             try { CoordLines.Apply(false); } catch { }
             try { VscsFrequencies.Apply(null); } catch { }
+            try { MetarRefresh.Clear(); } catch { }
         }
 
         private static void Clear()
@@ -161,6 +165,7 @@ namespace VatpacPlugin
             IsInstructor = false;
             Landlines = false;
             Frequencies = false;
+            Metars = null;
         }
 
         private static async void SessionTimer_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
@@ -181,6 +186,10 @@ namespace VatpacPlugin
                 var server = ConnectedServer;
 
                 VscsFrequencies.Apply(server != null && Frequencies ? server.Url : null);
+
+                // Not tied to the session running either - the instructor can change the weather while
+                // paused, and the ATIS should have it by the time things move again.
+                MetarRefresh.Apply(server != null ? Metars : null);
             }
             catch
             {
@@ -249,6 +258,7 @@ namespace VatpacPlugin
             IsInstructor = answer.State.IsInstructor;
             Landlines = answer.State.Landlines;
             Frequencies = answer.State.Frequencies;
+            Metars = answer.State.Metars;
 
             // A session with no scenario loaded isn't paused, it just hasn't started - freezing there
             // would hold the display still before there was ever anything on it.

@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 namespace VatpacPlugin
 {
     /// <summary>
@@ -32,5 +34,8 @@ namespace VatpacPlugin
 
         /// <summary>Whether the server answers vatSys's frequency lookups - see VscsFrequencies. False from a server that predates the field, against which vatSys's voice client is left alone.</summary>
         public bool Frequencies { get; set; }
+
+        /// <summary>The session's METARs as they stand, ICAO to raw text - what MetarRefresh goes by. Null from a server that predates the field, or that couldn't read them just now; either way nothing is refreshed.</summary>
+        public Dictionary<string, string> Metars { get; set; }
     }
 }
