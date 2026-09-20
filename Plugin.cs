@@ -11,12 +11,10 @@ namespace VatpacPlugin
     public class Plugin : IPlugin
     {
         public static bool Testing = false;
-        public static bool StateSavingDisabled = true;
         public string Name => "VATPAC";
         public static string DisplayName => "VATPAC";
 
         public static readonly HttpClient Client = new HttpClient();
-        private static SharedState SharedState { get; set; } = new SharedState();
 
         [DllImport("kernel32.dll", SetLastError = true)]
         [return: MarshalAs(UnmanagedType.Bool)]
@@ -34,22 +32,14 @@ namespace VatpacPlugin
             {
                 AllocConsole();
             }
-
-            if (StateSavingDisabled) return;
-
-            _ = SharedState.Init();
         }
         private void Network_Disconnected(object sender, EventArgs e)
         {
-            if (StateSavingDisabled) return;
-            SharedState.Disconnected();
         }
 
         private void Network_Connected(object sender, EventArgs e)
         {
             Sectors.Init();
-            if (StateSavingDisabled) return;
-            SharedState.Connected();
         }
 
         private void Audio_VSCSFrequenciesChanged(object sender, EventArgs e)
@@ -61,14 +51,10 @@ namespace VatpacPlugin
 
         public void OnFDRUpdate(FDP2.FDR updated)
         {
-            if (StateSavingDisabled) return;
-            SharedState.OnFdrUpdate(updated);
         }
 
         public async void OnRadarTrackUpdate(RDP.RadarTrack updated)
         {
-            if (StateSavingDisabled) return;
-            await SharedState.OnRadarUpdate(updated);
         }
     }
 }
