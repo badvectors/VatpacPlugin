@@ -19,7 +19,7 @@ namespace VatpacPlugin
 
         public static void CheckApproach()
         {
-            if (!Network.Me.Callsign.EndsWith("_APP")) return;
+            if (!Network.Me.Callsign.EndsWith("_APP") && !Network.Me.Callsign.EndsWith("_DEP")) return;
 
             var extending = new List<string>();
 
