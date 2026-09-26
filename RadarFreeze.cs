@@ -189,8 +189,13 @@ namespace VatpacPlugin
                 {
                     PositionFeed.RemoveEventHandler(null, RdpSubscription);
 
-                    // The oldest running poll, not the newest - see HistoryPolls.
-                    _held = _history.Count > 0 ? _history.Peek() : new List<Held>();
+                    // In RDP's place: an aircraft RDP has no track for yet still gets through, so it can
+                    // appear - see FrozenFeed.
+                    Network.OnlinePilotsChanged += FrozenFeed;
+
+                    // The oldest running poll, not the newest - see HistoryPolls. A copy, since Hold adds
+                    // the tracks it doesn't have.
+                    _held = _history.Count > 0 ? new List<Held>(_history.Peek()) : new List<Held>();
 
                     _frozenSinceUtc = DateTime.UtcNow;
                     Frozen = true;
@@ -269,12 +274,39 @@ namespace VatpacPlugin
             // Removing a subscription that isn't there is a no-op, so this lands on exactly one either way.
             try
             {
+                Network.OnlinePilotsChanged -= FrozenFeed;
+            }
+            catch { }
+
+            try
+            {
                 PositionFeed.RemoveEventHandler(null, RdpSubscription);
                 PositionFeed.AddEventHandler(null, RdpSubscription);
             }
             catch { }
 
             Frozen = false;
+        }
+
+        /// <summary>
+        /// The position feed while frozen: RDP only sees an aircraft it has no track for. A session that
+        /// is paused when vatSys connects (loaded, and play never pressed) freezes within a second of the
+        /// connection, and an aircraft whose first position hadn't been processed by then would otherwise
+        /// never be drawn at all. Its first return makes the track; Hold keeps it from there.
+        /// </summary>
+        private static void FrozenFeed(object sender, Network.PilotUpdateEventArgs e)
+        {
+            try
+            {
+                var pilot = e?.UpdatedPilot;
+
+                if (pilot == null || e.Removed) return;
+
+                if (RDP.RadarTracks.ToList().Any(x => !x.Cancelled && x.ActualAircraft?.Callsign == pilot.Callsign)) return;
+
+                RdpSubscription.DynamicInvoke(sender, e);
+            }
+            catch { }
         }
 
         /// <summary>
@@ -311,6 +343,25 @@ namespace VatpacPlugin
             try
             {
                 var now = DateTime.UtcNow;
+
+                // Every track on the scope is held, not only those in the running history. A session
+                // that was never run has no history at all, and holding nothing left every track to
+                // coast off the scope about 25 seconds after loading. With no running picture to pin,
+                // the speed and heading are what the simulator reports - it sends an airborne
+                // aircraft's groundspeed from the moment the scenario loads - so the label and leader
+                // line still read true.
+                foreach (var track in RDP.RadarTracks.ToList())
+                {
+                    if (track.Cancelled || track.ActualAircraft == null || _held.Any(x => x.Track == track)) continue;
+
+                    _held.Add(new Held
+                    {
+                        Track = track,
+                        GroundSpeed = track.ActualAircraft.GroundSpeed,
+                        Heading = track.ActualAircraft.Heading,
+                        VerticalSpeed = 0,
+                    });
+                }
 
                 foreach (var held in _held)
                 {
