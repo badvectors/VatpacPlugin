@@ -38,6 +38,8 @@ namespace VatpacPlugin
 
             Simulator.Init();
 
+            ArrivalLists.Init();
+
             if (Testing)
             {
                 AllocConsole();
