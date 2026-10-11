@@ -39,6 +39,17 @@ namespace VatpacPlugin
     /// up to a second, RDP has already derived a groundspeed of zero from it, and freezing that would pin
     /// the very zero this is trying to avoid.
     ///
+    /// STCA. Detaching the feed stops new returns being queued, but not the one already waiting: RDP
+    /// processes a track at most every five seconds, so nearly every track has a ProcessAircraft parked
+    /// in its delay, and each of those finishes within five seconds of the freeze - against a Timestamp
+    /// Hold has just set to now. It derives groundspeed and vertical rate from the movement since its
+    /// last return over pilot.LastUpdate minus that Timestamp, a fraction of a second or less than none,
+    /// so the track comes out at thousands of knots (or backwards) and STCA, which runs at the end of the
+    /// same call, projects it across half the sector and alerts on anything co-level in the way. Hold
+    /// puts the label right on the next poll, but STCA is only ever re-evaluated from ProcessAircraft, so
+    /// the alert would stand for the whole pause. The STCAs up at the moment of the freeze are therefore
+    /// noted, and any other one raised while frozen is taken straight back off (see DropNewConflicts).
+    ///
     /// One limit worth being honest about: this freezes radar processing only. FDP2 keeps running, so
     /// estimates and timers carry on against the wall clock. It is not a true pause of vatSys.
     ///
@@ -60,6 +71,25 @@ namespace VatpacPlugin
         private static readonly EventInfo PositionFeed;
         private static readonly Delegate RdpSubscription;
         private static readonly Action<RDP.RadarTrack> StartCoastCheck;
+
+        // vatsys.Alerts and vatsys.Alert are internal, so the STCA guard goes through these. Optional,
+        // unlike the members above: without them the freeze still works, it just can't take back an STCA
+        // raised by the processing already in flight when it started (see the summary).
+        private static readonly FieldInfo AlertsInstance;
+        private static readonly PropertyInfo AircraftAlerts;
+        private static readonly PropertyInfo AlertType;
+        private static readonly MethodInfo RemoveAlert;
+        private static readonly EventInfo AlertsChanged;
+        private static readonly EventHandler AlertsChangedHandler = (s, e) => DropNewConflicts();
+
+        /// <summary>Whether the STCA guard's members were found. False means STCAs raised while frozen are left alone.</summary>
+        private static readonly bool ConflictGuardAvailable;
+
+        /// <summary>The STCAs that were up at the moment of the freeze, by reference - Alert doesn't override Equals. Null while not frozen.</summary>
+        private static HashSet<object> _conflictsAtFreeze;
+
+        /// <summary>The Alerts instance AlertsChangedHandler is subscribed to, so Restore unsubscribes from that one and not whichever is current.</summary>
+        private static object _alertsSubscribedTo;
 
         /// <summary>
         /// How long after a thaw the coast check is replayed - see Rearm. RDP's own figure for the same
@@ -133,6 +163,30 @@ namespace VatpacPlugin
             {
                 Available = false;
             }
+
+            try
+            {
+                const BindingFlags instance = BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance;
+
+                var alerts = typeof(RDP).Assembly.GetType("vatsys.Alerts");
+                var alert = typeof(RDP).Assembly.GetType("vatsys.Alert");
+
+                if (alerts != null && alert != null)
+                {
+                    AlertsInstance = alerts.GetField("Instance", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Static);
+                    AircraftAlerts = alerts.GetProperty("AircraftAlerts", instance);
+                    AlertType = alert.GetProperty("Type", instance);
+                    RemoveAlert = alerts.GetMethod("RemoveAlert", instance, null, new[] { alert }, null);
+                    AlertsChanged = alerts.GetEvent("AlertsChanged", instance);
+                }
+
+                ConflictGuardAvailable = AlertsInstance != null && AircraftAlerts != null && AlertType?.PropertyType == typeof(AlertTypes)
+                    && RemoveAlert != null && AlertsChanged?.EventHandlerType == typeof(EventHandler);
+            }
+            catch
+            {
+                ConflictGuardAvailable = false;
+            }
         }
 
         /// <summary>
@@ -199,6 +253,8 @@ namespace VatpacPlugin
 
                     _frozenSinceUtc = DateTime.UtcNow;
                     Frozen = true;
+
+                    GuardConflicts();
                 }
                 catch
                 {
@@ -277,6 +333,8 @@ namespace VatpacPlugin
                 Network.OnlinePilotsChanged -= FrozenFeed;
             }
             catch { }
+
+            UnguardConflicts();
 
             try
             {
@@ -372,6 +430,86 @@ namespace VatpacPlugin
                 }
             }
             catch { }
+
+            // Backstop for the AlertsChanged subscription - an alert raised while it was being set up.
+            DropNewConflicts();
+        }
+
+        /// <summary>
+        /// Notes the STCAs up at the freeze and starts watching for new ones - see the summary. The
+        /// snapshot comes before the subscription, so nothing can be dropped against a half-taken one.
+        /// </summary>
+        private static void GuardConflicts()
+        {
+            if (!ConflictGuardAvailable) return;
+
+            try
+            {
+                var alerts = AlertsInstance.GetValue(null);
+
+                if (alerts == null) return;
+
+                _conflictsAtFreeze = new HashSet<object>(Conflicts(alerts));
+
+                AlertsChanged.AddEventHandler(alerts, AlertsChangedHandler);
+                _alertsSubscribedTo = alerts;
+            }
+            catch
+            {
+                UnguardConflicts();
+            }
+        }
+
+        private static void UnguardConflicts()
+        {
+            try
+            {
+                if (_alertsSubscribedTo != null) AlertsChanged.RemoveEventHandler(_alertsSubscribedTo, AlertsChangedHandler);
+            }
+            catch { }
+
+            _alertsSubscribedTo = null;
+            _conflictsAtFreeze = null;
+        }
+
+        /// <summary>
+        /// Takes off every STCA raised since the freeze. Runs on whichever thread raised the alert, as
+        /// AlertsChanged fires synchronously from AddAlert outside its lock; removing one raises
+        /// AlertsChanged again, which finds nothing left to do.
+        /// </summary>
+        private static void DropNewConflicts()
+        {
+            var atFreeze = _conflictsAtFreeze;
+
+            if (atFreeze == null) return;
+
+            try
+            {
+                var alerts = AlertsInstance.GetValue(null);
+
+                if (alerts == null) return;
+
+                foreach (var alert in Conflicts(alerts))
+                {
+                    if (!atFreeze.Contains(alert)) RemoveAlert.Invoke(alerts, new[] { alert });
+                }
+            }
+            catch { }
+        }
+
+        /// <summary>The STCAs currently up. AircraftAlerts is already a copy taken under Alerts' own lock.</summary>
+        private static List<object> Conflicts(object alerts)
+        {
+            var conflicts = new List<object>();
+
+            if (!(AircraftAlerts.GetValue(alerts) is System.Collections.IEnumerable all)) return conflicts;
+
+            foreach (var alert in all)
+            {
+                if (alert != null && (AlertTypes)AlertType.GetValue(alert) == AlertTypes.STCA) conflicts.Add(alert);
+            }
+
+            return conflicts;
         }
     }
 }
